@@ -23,7 +23,7 @@ int initial_message_permutation[] =	   {58, 50, 42, 34, 26, 18, 10, 2,
 										61, 53, 45, 37, 29, 21, 13, 5,
 										63, 55, 47, 39, 31, 23, 15, 7};
 
-// Key shift sizes for each round (1-based index, -1 is unused)
+// Key shift sizes for each round (1-based index)
 int key_shift_sizes[] = {1, 1, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1};
 
 // Permuted Choice 2 (PC-2): Subkey permutation table (56 -> 48 bits)
