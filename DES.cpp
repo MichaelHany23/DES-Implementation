@@ -106,7 +106,7 @@ uint64_t DESencryption(uint64_t input , uint64_t key )
 
 }
 
-int main()
+/*int main()
 {
     uint64_t key   = 0x133457799BBCDFF1; // example DES key
     uint64_t input = 0x0123456789ABCDEF;
@@ -115,15 +115,16 @@ int main()
     show_hex( DESencryption(0x12475321abcd1234 , key) );
 
  
-    /*uint64_t ip_output = IP(input); 
+    uint64_t ip_output = IP(input); 
     cout << "IP:  " << bin(ip_output) << endl;
     show_hex(ip_output);
     uint64_t pc1_output = pchoice1(key); 
     cout << "PC1: " << bin(pc1_output) << endl;
-    show_hex(pc1_output);*/
+    show_hex(pc1_output);
 
     return 0;
 }
+*/
 
 
 
