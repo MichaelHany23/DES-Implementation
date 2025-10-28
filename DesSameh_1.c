@@ -10,12 +10,16 @@
   - Uses fopen/fread/fwrite/fclose as required.
 */
 
+#define _POSIX_C_SOURCE 199309L
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <windows.h>
+#ifdef _WIN32
+# include <windows.h>
+#endif
 #ifdef __GNUC__
 # define __rdtsc __builtin_ia32_rdtsc
 #else
@@ -205,100 +209,55 @@ static uint64_t DES_ALGORITHM(uint64_t input, uint64_t key ,int encrypt)
     return output;
 }
   
+static uint64_t read_u64_be(FILE *f, int *ok)
+{
+    unsigned char b[8];
+    if (fread(b, 1, 8, f) != 8) { if (ok) *ok = 0; return 0; }
+    uint64_t v = 0;
+    for (int i = 0; i < 8; ++i) v = (v << 8) | b[i];
+    if (ok) *ok = 1;
+    return v;
+}
+
+static void write_u64_be(FILE *f, uint64_t v)
+{
+    unsigned char b[8];
+    for (int i = 7; i >= 0; --i) { b[i] = (unsigned char)(v & 0xFF); v >>= 8; }
+    fwrite(b, 1, 8, f);
+}
 
 int main(int argc, char **argv)
-{ 
-    // main arguments argc and argv to allow user enter data
-    /* argc -> arg counts , how many command lines */
-    /* argv -> array of commands */
-   
-    //function testing 
-/*
-
-    uint64_t key = 0x133457799BBCDFF1ULL;
-
-    uint64_t input = 0x0123456789ABCDEFULL;
-    uint64_t output;
-
-    LARGE_INTEGER freq, t1, t2;
-    QueryPerformanceFrequency(&freq);
-    QueryPerformanceCounter(&t1);
-    unsigned long long time1 = __rdtsc();
-
-    //under benchmark
-    output = DES_ALGORITHM(input, key,1);
-    output = DES_ALGORITHM(output, key,0);
-   
-    unsigned long long time2 = __rdtsc();
-   
-     
-    QueryPerformanceCounter(&t2);  // end timer
-
-    show_hex(output);
-
-    double elapsed = (double)(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
-    printf("Elapsed time for single encrypt+decrypt: %.9f seconds\n", elapsed);
-    
-    printf("CPU cycles for single encrypt+decrypt: %llu\n", time2 - time1);
-*/
-
-    //arguments handling
-    // student.exe e key plaintext ciphertext
+{
     if (argc != 5) {
-        printf("Usage: %s e|d key input output\n", argv[0]);
+        fprintf(stderr, "Usage: %s <e|d> keyfile infile outfile\n", argv[0]);
         return 1;
     }
+    char mode = argv[1][0];
+    const char *keyfile = argv[2], *infile = argv[3], *outfile = argv[4];
 
-    char mode = argv[1][0];  // 'e' or 'd'
-    char *keyfile = argv[2];
-    char *infile  = argv[3];
-    char *outfile = argv[4];
+    FILE *kf = fopen(keyfile, "rb");
+    if (!kf) { perror("opening keyfile"); return 1; }
+    int ok;
+    uint64_t key = read_u64_be(kf, &ok);
+    fclose(kf);
+    if (!ok) { fprintf(stderr, "keyfile must be 8 bytes\n"); return 1; }
 
-    FILE *keyFile = fopen(keyfile, "rb");
-    if (!keyFile) {
-    printf("Error: cannot open key file\n");
-    exit(1);
+    FILE *in = fopen(infile, "rb");
+    FILE *out = fopen(outfile, "wb");
+    if (!in || !out) { perror("opening files"); if (in) fclose(in); if (out) fclose(out); return 1; }
+
+    int encrypt = (mode == 'e') ? 1 : 0;
+    size_t blocks = 0;
+    while (1) {
+        uint64_t block = read_u64_be(in, &ok);
+        if (!ok) break;
+        uint64_t outblock = DES_ALGORITHM(block, key, encrypt);
+        write_u64_be(out, outblock);
+        ++blocks;
     }
 
-    uint64_t key;
-    size_t read = fread(&key, sizeof(uint64_t), 1, keyFile); // read and put in key
-    if (read != 1) {
-    printf("Error: cannot read key\n");
-    exit(1);
-    }
-    fclose(keyFile); 
-
-    FILE *inFile = fopen(infile, "rb");
-    FILE *outFile = fopen(outfile, "wb");
-    if (!inFile || !outFile) {
-    printf("Error opening input/output files\n");
-    exit(1);
-    }
-
-    uint64_t block;
-    if(mode == 'e') {
-        while (fread(&block, sizeof(uint64_t), 1, inFile) == 1) 
-        {
-        uint64_t encrypted = DES_ALGORITHM(block, key , 1);  // use your DES function
-        fwrite(&encrypted, sizeof(uint64_t), 1, outFile);
-        }       
-    }
-    else if(mode == 'd')
-    {
-        while (fread(&block, sizeof(uint64_t), 1, inFile) == 1) 
-        {
-        uint64_t decrypted = DES_ALGORITHM(block, key , 0);  // use your DES function
-        fwrite(&decrypted, sizeof(uint64_t), 1, outFile);
-        }   
-    }
-    else 
-    {
-        printf("error , mode is not included\n");
-        return 0;
-    }
-
-    fclose(inFile);
-    fclose(outFile);
-
-
+    fclose(in);
+    fclose(out);
+    printf("Processed %zu block(s)\n", blocks);
+    return 0;
 }
